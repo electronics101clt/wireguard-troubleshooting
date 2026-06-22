@@ -21,28 +21,28 @@ Server's running WireGuard interface was missing the Android peer configuration,
 ### 1. Verify Port Forwarding
 ```bash
 # Test external accessibility of WireGuard port
-timeout 5 nc -zvu <domain>:51820
+timeout 5 nc -zvu HOSTNAME:PORT
 
 # Check router port forwarding rules
-# Expected: UDP 51820 → Server IP
+# Expected: UDP PORT → Server IP
 ```
 
 ### 2. Check DNS Resolution
 ```bash
-# Verify DuckDNS/dynamic DNS resolves correctly
-nslookup <domain> 1.1.1.1
+# Verify dynamic DNS resolves correctly
+nslookup HOSTNAME DNS_SERVER
 
 # Compare to server's actual public IP
-ssh user@server "curl -4 -s ifconfig.me"
+ssh USER@SERVER "curl -4 -s ifconfig.me"
 ```
 
 ### 3. Inspect WireGuard Server Status
 ```bash
 # List active peers on server
-ssh user@server "sudo wg show wg0 peers"
+ssh USER@SERVER "sudo wg show INTERFACE peers"
 
 # Check latest handshakes
-ssh user@server "sudo wg show wg0 latest-handshakes"
+ssh USER@SERVER "sudo wg show INTERFACE latest-handshakes"
 
 # Expected: All configured peers should appear
 ```
@@ -51,13 +51,13 @@ ssh user@server "sudo wg show wg0 latest-handshakes"
 Key fields in client config:
 ```ini
 [Interface]
-PrivateKey = <client_private_key>
-Address = <vpn_ip>/32
-DNS = 8.8.8.8, 8.8.4.4
+PrivateKey = CLIENT_PRIVATE_KEY
+Address = VPN_IP/32
+DNS = DNS_SERVER_1, DNS_SERVER_2
 
 [Peer]
-PublicKey = <SERVER_public_key>  # Must match server's public key
-Endpoint = <domain>:51820
+PublicKey = SERVER_PUBLIC_KEY  # Must match server's public key
+Endpoint = HOSTNAME:PORT
 AllowedIPs = 0.0.0.0/0  # Full tunnel
 PersistentKeepalive = 25
 ```
@@ -66,14 +66,14 @@ PersistentKeepalive = 25
 
 ### 5. Check Server Configuration File
 ```bash
-ssh user@server "sudo cat /etc/wireguard/wg0.conf | grep -A 5 '\[Peer\]'"
+ssh USER@SERVER "sudo cat /etc/wireguard/INTERFACE.conf | grep -A 5 '\[Peer\]'"
 ```
 
 Expected peer sections:
 ```ini
 [Peer]
-PublicKey = <client_public_key>
-AllowedIPs = <vpn_ip>/32
+PublicKey = CLIENT_PUBLIC_KEY
+AllowedIPs = VPN_IP/32
 PersistentKeepalive = 25
 ```
 
@@ -85,21 +85,21 @@ Server configuration file had Android peer defined, but running WireGuard interf
 ### Solution
 Add peer to running interface without restarting:
 ```bash
-ssh user@server "sudo wg set wg0 peer <CLIENT_PUBLIC_KEY> \
-  allowed-ips <VPN_IP>/32 \
+ssh USER@SERVER "sudo wg set INTERFACE peer CLIENT_PUBLIC_KEY \
+  allowed-ips VPN_IP/32 \
   persistent-keepalive 25"
 ```
 
 ### Verification
 ```bash
 # Confirm peer is now active
-ssh user@server "sudo wg show wg0 peers"
+ssh USER@SERVER "sudo wg show INTERFACE peers"
 
 # Check for successful handshake
-ssh user@server "sudo wg show wg0 | grep -A 5 '<CLIENT_PUBLIC_KEY>'"
+ssh USER@SERVER "sudo wg show INTERFACE | grep -A 5 'CLIENT_PUBLIC_KEY'"
 
 # Test connectivity from client
-adb shell "ping -c 4 <VPN_SERVER_IP>"
+ping -c 4 VPN_SERVER_IP
 ```
 
 ## Success Criteria
@@ -110,11 +110,11 @@ adb shell "ping -c 4 <VPN_SERVER_IP>"
 
 Example output:
 ```
-peer: <client_public_key>
-  endpoint: <client_public_ip>:<random_port>
-  allowed ips: <vpn_ip>/32
+peer: CLIENT_PUBLIC_KEY
+  endpoint: CLIENT_PUBLIC_IP:RANDOM_PORT
+  allowed ips: VPN_IP/32
   latest handshake: 45 seconds ago
-  transfer: 82.32 KiB received, 96.15 KiB sent
+  transfer: XX.XX KiB received, XX.XX KiB sent
   persistent keepalive: every 25 seconds
 ```
 
@@ -131,13 +131,13 @@ peer: <client_public_key>
 - OR restart interface: `sudo wg-quick down wg0 && sudo wg-quick up wg0`
 
 ### 3. Router Port Forwarding
-- Must forward **UDP** (not TCP) port 51820
+- Must forward **UDP** (not TCP) on the WireGuard port
 - Verify with external connectivity test
 - Some ISPs block VPN protocols
 
 ### 4. Firewall Issues
-- Ensure iptables/ufw allows UDP 51820
-- Check with: `sudo iptables -L -n -v | grep 51820`
+- Ensure iptables/ufw allows UDP on the WireGuard port
+- Check with: `sudo iptables -L -n -v | grep PORT`
 
 ### 5. DNS Resolution on Mobile Networks
 - Some carriers use DNS hijacking or proxies
@@ -148,10 +148,10 @@ peer: <client_public_key>
 After confirming live changes work:
 ```bash
 # Update config file
-ssh user@server "sudo nano /etc/wireguard/wg0.conf"
+ssh USER@SERVER "sudo nano /etc/wireguard/INTERFACE.conf"
 
 # Restart to verify persistence
-ssh user@server "sudo systemctl restart wg-quick@wg0"
+ssh USER@SERVER "sudo systemctl restart wg-quick@INTERFACE"
 ```
 
 ## Additional Tools
@@ -166,8 +166,8 @@ ssh user@server "sudo systemctl restart wg-quick@wg0"
 
 ### Testing Client Connectivity
 ```bash
-# Test from Android via ADB
-adb shell "ping -c 4 <vpn_server_ip>"
+# Test connectivity to VPN server
+ping -c 4 VPN_SERVER_IP
 
 # Check VPN interface on client
 # WireGuard app shows tx/rx statistics
@@ -183,4 +183,4 @@ adb shell "ping -c 4 <vpn_server_ip>"
 ## References
 - WireGuard documentation: https://www.wireguard.com/
 - Port forwarding verification tools
-- Dynamic DNS services (DuckDNS, No-IP, etc.)
+- Dynamic DNS services
